@@ -6,6 +6,8 @@ on:
 jobs:
   workspace:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     steps:
       - name: Checkout OpenMontage
         uses: actions/checkout@v4
@@ -22,4 +24,16 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Setup SSH Workspace (tmate)
+        id: tmate
         uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
+
+      - name: Publish Connection Info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create --title "Cloud Workspace is Ready!" --body "Connect via SSH: \`${{ steps.tmate.outputs.ssh-command }}\` or Web: ${{ steps.tmate.outputs.web-url }}"
+
+      - name: Keep Alive
+        run: sleep 21600
