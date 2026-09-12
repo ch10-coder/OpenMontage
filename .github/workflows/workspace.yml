@@ -6,8 +6,6 @@ on:
 jobs:
   workspace:
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
     steps:
       - name: Checkout OpenMontage
         uses: actions/checkout@v4
@@ -29,11 +27,16 @@ jobs:
         with:
           detached: true
 
-      - name: Publish Connection Info
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Save Connection Info
         run: |
-          gh issue create --title "Cloud Workspace is Ready!" --body "Connect via SSH: \`${{ steps.tmate.outputs.ssh-command }}\` or Web: ${{ steps.tmate.outputs.web-url }}"
+          echo "Connect via SSH: ${{ steps.tmate.outputs.ssh-command }}" > connection-info.txt
+          echo "Connect via Web: ${{ steps.tmate.outputs.web-url }}" >> connection-info.txt
+
+      - name: Upload Connection Info
+        uses: actions/upload-artifact@v4
+        with:
+          name: connection-info
+          path: connection-info.txt
 
       - name: Keep Alive
         run: sleep 21600
