@@ -6,6 +6,8 @@ on:
 jobs:
   workspace:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout OpenMontage
         uses: actions/checkout@v4
@@ -22,18 +24,27 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Start tmate in background
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tmate -S /tmp/tmate.sock new-session -d
+          sleep 5
           tmate -S /tmp/tmate.sock wait tmate-ready
           echo "Connect via SSH: $(tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}')" > connection-info.txt
           echo "Connect via Web: $(tmate -S /tmp/tmate.sock display -p '#{tmate_web}')" >> connection-info.txt
-          cat connection-info.txt
-
-      - name: Upload Connection Info
-        uses: actions/upload-artifact@v4
-        with:
-          name: connection-info
-          path: connection-info.txt
-
-      - name: Keep Alive
-        run: sleep 21600
+          
+          # Check if file exists to get SHA for update, otherwise just create
+          SHA=$(gh api repos/${{ github.repository }}/contents/workspace-info.txt --jq .sha 2>/dev/null || echo "")
+          if [ -z "$SHA" ]; then
+            gh api -X PUT repos/${{ github.repository }}/contents/workspace-info.txt \
+              -f message="Add workspace info" \
+              -f content="$(base64 -w0 connection-info.txt)"
+          else
+            gh api -X PUT repos/${{ github.repository }}/contents/workspace-info.txt \
+              -f message="Update workspace info" \
+              -f content="$(base64 -w0 connection-info.txt)" \
+              -f sha="$SHA"
+          fi
+          
+          # Hang forever to keep tmate alive
+          sleep 21600
