@@ -12,7 +12,6 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v5
-        with:
           python-version: '3.11'
 
       - name: Install Dependencies
@@ -23,4 +22,3 @@ jobs:
 
       - name: Setup SSH Workspace (tmate)
         uses: mxschmitt/action-tmate@v3
-        with:
