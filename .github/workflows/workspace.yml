@@ -18,19 +18,16 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg make
+          sudo apt-get install -y ffmpeg make tmate
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Setup SSH Workspace (tmate)
-        id: tmate
-        uses: mxschmitt/action-tmate@v3
-        with:
-          detached: true
-
-      - name: Save Connection Info
+      - name: Start tmate in background
         run: |
-          echo "Connect via SSH: ${{ steps.tmate.outputs.ssh-command }}" > connection-info.txt
-          echo "Connect via Web: ${{ steps.tmate.outputs.web-url }}" >> connection-info.txt
+          tmate -S /tmp/tmate.sock new-session -d
+          tmate -S /tmp/tmate.sock wait tmate-ready
+          echo "Connect via SSH: $(tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}')" > connection-info.txt
+          echo "Connect via Web: $(tmate -S /tmp/tmate.sock display -p '#{tmate_web}')" >> connection-info.txt
+          cat connection-info.txt
 
       - name: Upload Connection Info
         uses: actions/upload-artifact@v4
