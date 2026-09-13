@@ -6,6 +6,8 @@ on:
 jobs:
   workspace:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout OpenMontage
         uses: actions/checkout@v4
@@ -18,8 +20,36 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg make
+          sudo apt-get install -y ffmpeg make tmate
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Setup SSH Workspace (tmate)
-        uses: mxschmitt/action-tmate@v3
+      - name: Run tmate and upload info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Start a background process that waits for tmate to initialize,
+          # gets the SSH connection string, and commits it to the repository.
+          (
+            sleep 15
+            tmate -S /tmp/tmate.sock wait tmate-ready
+            SSH_CMD=$(tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}')
+            WEB_CMD=$(tmate -S /tmp/tmate.sock display -p '#{tmate_web}')
+            echo -e "SSH: $SSH_CMD\nWeb: $WEB_CMD" > info.txt
+            
+            SHA=$(gh api repos/${{ github.repository }}/contents/workspace-info.txt --jq .sha 2>/dev/null || echo "")
+            if [ -z "$SHA" ]; then
+              gh api -X PUT repos/${{ github.repository }}/contents/workspace-info.txt \
+                -f message="Add workspace info" \
+                -f content="$(base64 -w0 info.txt)"
+            else
+              gh api -X PUT repos/${{ github.repository }}/contents/workspace-info.txt \
+                -f message="Update workspace info" \
+                -f content="$(base64 -w0 info.txt)" \
+                -f sha="$SHA"
+            fi
+          ) &
+          
+          # Start tmate in foreground to block the step and keep runner alive
+          tmate -S /tmp/tmate.sock new-session -d
+          tmate -S /tmp/tmate.sock wait tmate-ready
+          tmate -S /tmp/tmate.sock attach
